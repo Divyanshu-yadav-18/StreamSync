@@ -3,16 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <title>FFmpeg Stream Tester</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        #logs { background: #f4f4f4; padding: 15px; margin-top: 15px; border: 1px solid #ddd; font-family: monospace; white-space: pre-wrap; }
+    </style>
 </head>
 <body>
     <h1>FFmpeg Stream Tester</h1>
-    <p>Select a video file to stream to the backend.</p>
+    <p>Select a <strong>.webm</strong> file to stream to the backend.</p>
 
-    <input type="file" id="videoInput" />
+    <input type="file" id="videoInput" accept=".webm" />
     <button onclick="startStream()">Start Upload Stream</button>
 
     <h3>Status: <span id="status">Idle</span></h3>
-    <div id="logs" style="background: #f0f0f0; padding: 10px; margin-top: 10px;"></div>
+    <div id="logs">Logs will appear here...</div>
 
     <script>
         async function startStream() {
@@ -26,33 +30,39 @@
             }
 
             const file = input.files[0];
-            const roomId = "test-room-1"; // Hardcoded for testing
+            const roomId = "test-room-1"; 
 
-            status.innerText = "Streaming...";
-            logs.innerHTML += `<p>Starting stream for ${file.name}...</p>`;
+            // Clear previous logs
+            logs.innerHTML = "";
+            status.innerText = "Uploading...";
+            logs.innerHTML += `> Starting stream for: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)\n`;
 
             try {
-                // 2. The Magic Fetch Call
-                // This simulates exactly what the React Frontend will do
+                // --- THE MAGIC FIX ---
+                // We send the 'file' object directly. 
+                // This mimics "curl --data-binary @file" exactly.
                 const response = await fetch(`/stream?roomId=${roomId}`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/octet-stream' },
-                    // 'duplex' is required for streaming bodies in Chrome/Edge
-                    duplex: 'half', 
-                    body: file.stream() 
+                    headers: { 
+                        'Content-Type': 'application/octet-stream' // Vital: Tells server it's raw video
+                    },
+                    body: file // Sending 'file' directly is safer than file.stream() for compatibility
                 });
 
                 if (response.ok) {
-                    status.innerText = "Stream Started!";
-                    logs.innerHTML += `<p>Server responded: OK. Check your server logs/files.</p>`;
+                    status.innerText = "Stream Request Sent!";
+                    const responseText = await response.text();
+                    logs.innerHTML += `> Server Responded: 200 OK\n`;
+                    logs.innerHTML += `> Server Message: ${responseText}\n`;
+                    logs.innerHTML += `> SUCCESS: Check your Docker logs now!`;
                 } else {
-                    status.innerText = "Error";
-                    logs.innerHTML += `<p>Error: ${response.statusText}</p>`;
+                    status.innerText = "Server Error";
+                    logs.innerHTML += `> Error ${response.status}: ${response.statusText}\n`;
                 }
             } catch (err) {
                 console.error(err);
-                status.innerText = "Failed";
-                logs.innerHTML += `<p>Connection Failed: ${err.message}</p>`;
+                status.innerText = "Connection Failed";
+                logs.innerHTML += `> Network Error: ${err.message}\n`;
             }
         }
     </script>
